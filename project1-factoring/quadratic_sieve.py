@@ -1,4 +1,6 @@
 import math
+import os
+import time
 
 def prime_factorization(n): # TODO: use something homemade
     factorized = []
@@ -46,50 +48,95 @@ def generate_matrix_row(factorization, factor_base_list):
     return new_row
 
 def gaussian_elimination(matrix):
-    prime_index = 0
-    target_number_rows = len(matrix) - len(matrix[0])
-    while prime_index < 10:
+    """
+    Writes matrix to a file to be used as input to the provided program,
+    returns all the solutions
+    """
+    m = len(matrix)
+    n = len(matrix[0])
+    with open("matrix_input.txt", "w") as file:
+        file.write("{} {}\n".format(m, n))
         for row in matrix:
-            if row[prime_index] == 1:
-                for row2 in matrix:
-                    if row2 != row:
-                        for i in range(len(row)):
-                            if row2[prime_index] == 1:
-                                row2[i] = (row2[i] + row[i]) % 2
-                matrix.remove(row)
-        prime_index += 1
+            stringed_row = [str(i) for i in row]
+            file.write(" ".join(stringed_row))
+            file.write("\n")
+    
+    os.system("GaussBin.exe matrix_input.txt result.txt")
+
+    with open("result.txt", "r") as output:
+        raw_result = output.readlines()[1:]
+
+    separated = [result.split() for result in raw_result]
+    final_result = []
+    for solution in separated:
+        final_result.append([int(x) for x in solution])
+    return final_result
 
 
 def quadratic_sieve(given_number):
-    factor_base = 10
+    factor_base = 1000
     factor_base_list = generate_factor_base_list(factor_base)
+    print("Generated primes list.")
     r_values = []
     matrix = []
+    factorizations = {}
+    r_values_seen = []
     # Generate r values
     k = 2
     j = 2
-    while len(r_values) < factor_base + 2:
-        r = math.floor(math.sqrt(k * given_number)) + j
-
+    print("Starting r_numbers generation...")
+    while k < factor_base + 2:
+        #print("(k: {}, j:{}".format(k,j))
         if j > k:
             j = 1
             k += 1
 
-        factorization = prime_factorization(r ** 2 % given_number)
-        if factorization[-1] <= factor_base_list[-1]:
-            new_row = generate_matrix_row(factorization, factor_base_list)
-            if new_row not in matrix:
-                matrix.append(new_row)
-                r_values.append((r, factorization))
-                j += 1
-                continue
+        r = math.floor(math.sqrt(k * given_number)) + j
+
+        if r ** 2 % given_number > 1 and r ** 2 % given_number not in r_values_seen:
+            r_values_seen.append(r)
+            factorization = prime_factorization(r ** 2 % given_number)
+            if factorization[-1] <= factor_base_list[-1]:
+                new_row = generate_matrix_row(factorization, factor_base_list)
+                if new_row not in matrix:
+                    matrix.append(new_row)
+                    r_values.append((r, factorization))
+                    print(r)
+                    j += 1
+                    continue
         j += 1
-    print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in matrix]))
-    gaussian_elimination(matrix)
-    print("#####################################")
-    print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in matrix]))
-    print(len(matrix))
+
+    print("Finding solutions...")
+    solutions = gaussian_elimination(matrix)
+    for solution in solutions:
+        x = 1
+        y = 1
+        for equation, i in enumerate(solution):
+            if i == 1:
+                x *= r_values[equation][0]
+                for k in r_values[equation][1]:
+                    y *= k
+
+        x = x % given_number
+        y = int(math.sqrt(y)) % given_number
+        gcd = math.gcd(max([x,y]) - min([x,y]), given_number)
+        if gcd != 1:
+            return gcd, int(given_number/gcd)
 
 
+# TESTS #
+test = False
+if test:
+    print("Tests for quadratic sieve have started.")
+    in_values = [323, 307561, 31741649, 3205837387, 392742364277][:-1]
+    expected = [(17,19), (457, 673), (4621, 6869), (46819, 68473), (534571, 734687)][:-1]
 
-quadratic_sieve(16637)  # should return (17, 19)
+    for index, value in enumerate(in_values):
+        print("Running for input {}".format(value))
+        start = time.clock()
+        print("Got: {}, expected: {}".format(quadratic_sieve(value), expected[index]))
+        print("Execution time: {} seconds.".format(time.clock()))
+        print("\n")
+
+print(quadratic_sieve(323))
+# quadratic_sieve(235616869893895625763911) # Group 12 (me) input
